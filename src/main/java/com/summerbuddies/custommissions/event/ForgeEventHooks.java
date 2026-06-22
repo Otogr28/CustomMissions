@@ -18,6 +18,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -78,14 +79,27 @@ public final class ForgeEventHooks {
         }
     }
 
-    @SubscribeEvent
+    // Both interact paths + receiveCanceled: EasyNPC may resolve the right-click at the "specific" level
+    // and/or cancel the event to open its dialog, so we listen broadly and dedupe via the one-shot objective.
+    @SubscribeEvent(receiveCanceled = true)
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
-        if (!(event.getEntity() instanceof ServerPlayer player) || event.getHand() != InteractionHand.MAIN_HAND) {
+        handleInteract(event.getEntity(), event.getTarget(), event.getHand());
+    }
+
+    @SubscribeEvent(receiveCanceled = true)
+    public static void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
+        handleInteract(event.getEntity(), event.getTarget(), event.getHand());
+    }
+
+    private static void handleInteract(Player player, Entity target, InteractionHand hand) {
+        if (!(player instanceof ServerPlayer sp) || hand != InteractionHand.MAIN_HAND) {
             return;
         }
-        Entity target = event.getTarget();
         if (EasyNpcBridge.isNpc(target)) {
-            MissionEventBus.dispatch(player,
+            // Temporary diagnostic (remove in M2 cleanup): confirms the event fires + the NPC's real name/uuid.
+            Constants.LOG.info("[custommissions] npc interact by {} -> name='{}' uuid={}",
+                    sp.getGameProfile().getName(), EasyNpcBridge.npcName(target), EasyNpcBridge.npcUuid(target));
+            MissionEventBus.dispatch(sp,
                     new MissionEvent.NpcTalk(EasyNpcBridge.npcUuid(target), EasyNpcBridge.npcName(target)));
         }
     }

@@ -168,7 +168,12 @@ public final class Objectives {
         if (uuid != null && uuid.equals(t.uuid())) {
             return true;
         }
-        return name != null && !name.isBlank() && t.name() != null && name.equalsIgnoreCase(t.name());
+        // Normalize names so "the-traveler" matches the NPC's display name "The Traveler" (case, spaces, punctuation).
+        return name != null && !name.isBlank() && t.name() != null && normName(name).equals(normName(t.name()));
+    }
+
+    private static String normName(String s) {
+        return s.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 
     private static int countItem(ServerPlayer p, ResourceLocation item) {

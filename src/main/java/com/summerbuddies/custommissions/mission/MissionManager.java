@@ -319,7 +319,7 @@ public final class MissionManager {
               "giver": { "npcName": "the-traveler" },
               "prerequisites": { "loreStage": 0 },
               "objectives": [
-                { "type": "talk_to_npc", "npcName": "the-traveler", "description": "Find the Traveler" },
+                { "type": "talk_to_npc", "npcUuid": "d48a3f45-0efd-46c6-9803-5e1256d95d33", "npcName": "the-traveler", "description": "Find the Traveler" },
                 { "type": "collect_item", "item": "minecraft:oak_log", "count": 4, "description": "Gather 4 oak logs" }
               ],
               "rewards": [
