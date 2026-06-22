@@ -5,16 +5,21 @@ import com.summerbuddies.custommissions.net.MissionSyncS2C;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.fml.ModList;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Client-only holder of the data the server pushes: the active quest markers ({@link MarkerOverlay} reads
- * them) and the missions snapshot ({@link MissionsScreen} reads it). Reached only on the physical client
- * (via {@code DistExecutor.unsafeRunWhenOn(Dist.CLIENT, …)} in the packet handlers).
+ * Client-only holder of the data the server pushes: quest markers ({@link MarkerOverlay} + JourneyMap read
+ * them) and the missions snapshot ({@link MissionsScreen} + {@link MissionHudOverlay} read it). Also owns
+ * the client-side <b>tracked set</b> — which missions appear in the left HUD. Newly-accepted missions are
+ * auto-tracked; the screen's Track button toggles membership so a mission can be hidden from the HUD.
+ * Reached only on the physical client (via {@code DistExecutor.unsafeRunWhenOn(Dist.CLIENT, …)}).
  */
 public final class ClientMissions {
 
@@ -23,33 +28,49 @@ public final class ClientMissions {
     private static final Map<String, Marker> MARKERS = new ConcurrentHashMap<>();
     private static final MissionSyncS2C EMPTY = new MissionSyncS2C(List.of(), List.of(), List.of());
 
+    /** Missions shown in the left HUD. */
+    private static final Set<String> TRACKED = ConcurrentHashMap.newKeySet();
+    /** Active mission ids we've already seen, so a mission is auto-tracked exactly once (on first accept). */
+    private static final Set<String> KNOWN_ACTIVE = ConcurrentHashMap.newKeySet();
+
     private static volatile MissionSyncS2C snapshot = EMPTY;
-    private static volatile String trackedId;
     private static boolean openRequested;
 
     private ClientMissions() {}
 
-    /** The mission highlighted/expanded in the left HUD (chosen via the screen's Track button). */
-    public static String trackedId() {
-        return trackedId;
+    // ---- HUD tracking ----------------------------------------------------------------------------
+
+    public static boolean isTracked(String missionId) {
+        return TRACKED.contains(missionId);
     }
 
-    public static void setTracked(String id) {
-        trackedId = id;
+    /** Toggle whether a mission shows in the left HUD. */
+    public static void toggleTracked(String missionId) {
+        if (!TRACKED.remove(missionId)) {
+            TRACKED.add(missionId);
+        }
     }
 
     // ---- markers ---------------------------------------------------------------------------------
 
     public static void applyMarker(MarkerS2C p) {
+        boolean jm = ModList.get().isLoaded("journeymap");
         if (!p.show()) {
             MARKERS.remove(p.missionId());
+            if (jm) {
+                JourneyMapBridge.remove(p.missionId());
+            }
             return;
         }
         ResourceLocation dim = ResourceLocation.tryParse(p.dimension());
         if (dim == null) {
             return;
         }
-        MARKERS.put(p.missionId(), new Marker(p.missionId(), dim, new BlockPos(p.x(), p.y(), p.z()), p.name(), p.rgb()));
+        BlockPos pos = new BlockPos(p.x(), p.y(), p.z());
+        MARKERS.put(p.missionId(), new Marker(p.missionId(), dim, pos, p.name(), p.rgb()));
+        if (jm) {
+            JourneyMapBridge.sync(p.missionId(), p.name(), dim, pos, p.rgb());
+        }
     }
 
     public static Collection<Marker> markers() {
@@ -59,7 +80,8 @@ public final class ClientMissions {
     public static void clear() {
         MARKERS.clear();
         snapshot = EMPTY;
-        trackedId = null;
+        TRACKED.clear();
+        KNOWN_ACTIVE.clear();
     }
 
     // ---- missions snapshot -----------------------------------------------------------------------
@@ -76,6 +98,7 @@ public final class ClientMissions {
     /** Called from the packet handler on the client thread when a fresh snapshot arrives. */
     public static void applySnapshot(MissionSyncS2C s) {
         snapshot = s;
+        autoTrack(s);
         Minecraft mc = Minecraft.getInstance();
         if (openRequested) {
             openRequested = false;
@@ -83,5 +106,20 @@ public final class ClientMissions {
         } else if (mc.screen instanceof MissionsScreen screen) {
             screen.refresh();
         }
+    }
+
+    /** Auto-track each mission the first time it becomes active; forget tracking once it's no longer active. */
+    private static void autoTrack(MissionSyncS2C s) {
+        Set<String> active = new HashSet<>();
+        for (MissionSyncS2C.Entry e : s.active()) {
+            active.add(e.id());
+        }
+        for (String id : active) {
+            if (KNOWN_ACTIVE.add(id)) {
+                TRACKED.add(id);
+            }
+        }
+        KNOWN_ACTIVE.retainAll(active);
+        TRACKED.retainAll(active);
     }
 }

@@ -52,6 +52,11 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // JourneyMap client API — COMPILE-ONLY (every call is guarded by ModList.isLoaded("journeymap") at
+    // runtime, so the mod still works if JourneyMap is absent). Used to drop a real map waypoint + in-world
+    // beam for reach_location objectives. fg.deobf remaps the production jar's MC references to dev mappings.
+    compileOnly fg.deobf(files("../MCserver/mods/journeymap-1.20.1-5.10.3-forge.jar"))
 }
 
 // Expand mod metadata into mods.toml / pack.mcmeta at build time.

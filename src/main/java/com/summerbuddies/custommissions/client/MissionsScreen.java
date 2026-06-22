@@ -276,7 +276,7 @@ public final class MissionsScreen extends Screen {
             btnActive = true;
             drawBtn(g, font, btnX, btnY, btnW, btnH, "Abandon", 0xFFD18A8A, mouseX, mouseY);
 
-            boolean isTracked = e.id().equals(ClientMissions.trackedId());
+            boolean isTracked = ClientMissions.isTracked(e.id());
             trkX = btnX - 8 - bw;
             trkY = by;
             trkW = bw;
@@ -320,10 +320,10 @@ public final class MissionsScreen extends Screen {
                     return true;
                 }
             }
-            // track button (active tab) — client-side highlight, no server round-trip
+            // track button (active tab) — toggles HUD visibility, client-side, no server round-trip
             if (trkActive && mx >= trkX && mx <= trkX + trkW && my >= trkY && my <= trkY + trkH
                     && selected < list.size()) {
-                ClientMissions.setTracked(list.get(selected).id());
+                ClientMissions.toggleTracked(list.get(selected).id());
                 return true;
             }
             // accept / abandon
