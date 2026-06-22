@@ -52,7 +52,7 @@ for ctx in "$STATE"/context/*.json; do
     log "generating dailies for $name ($uuid)"
     resp="$(claude -p "$PROMPT
 
-=== WORLD_STATE ===
+=== WORLD_STATE (LIVE source of truth) ===
 $WS
 
 === PLAYER_CONTEXT ===
@@ -61,13 +61,25 @@ $CTX
 === DSL (the mission language) ===
 $DSL
 
+=== EXTRA CONTEXT (optional — read files under $GEN_DIR/context/ if useful) ===
+You may read, with your tools, to enrich the missions:
+  context/docs/npcs/*.md      mission givers (names, uuids, coords, personalities; the Traveler is the main giver)
+  context/docs/lore-bible.md, context/docs/Story/   tone + current lore stage (do NOT reveal hidden plot)
+  context/docs/infomods/      per-mod content catalog (real mob/item/biome/dimension ids + stats)
+  context/player-stats/$uuid.json, context/player-advancements/$uuid.json   this player's raw stats/advancements
+  context/state/world_state.json   LIVE truth (knownDimensions, lore stage, givers)
+Docs may be STALE — use ONLY ids confirmed in context/state/world_state.json or vanilla minecraft: ids.
+
 TASK: Output ONLY a JSON array of exactly 3 daily mission objects (no prose, no markdown code fences).
 Each object must be valid per the DSL, with: \"category\":\"daily\", \"assignTo\":[\"$name\"],
 \"expiryHours\":24, and a unique \"id\" like \"daily_${TODAY}_${name}_01\" (..._02, ..._03)." \
+        --add-dir "$GEN_DIR/context" --add-dir "$SERVER_DIR/world" --add-dir "$SERVER_DIR/config/custommissions" \
+        --allowedTools Read Glob Grep </dev/null \
         2>>"$GEN_DIR/gen.log")"
 
-    # tolerate accidental ```json fences
-    resp="$(printf '%s' "$resp" | sed -e 's/^[[:space:]]*```json[[:space:]]*//' -e 's/^[[:space:]]*```[[:space:]]*//' -e 's/```[[:space:]]*$//')"
+    # With file tools, Claude may wrap the array in narration/fences. Extract the outermost JSON array
+    # (first '[' .. last ']') so prose around it doesn't matter.
+    resp="$(printf '%s' "$resp" | python3 -c 'import sys; t=sys.stdin.read(); i=t.find("["); j=t.rfind("]"); sys.stdout.write(t[i:j+1] if (i>=0 and j>i) else "")')"
 
     if ! printf '%s' "$resp" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
         log "  bad/empty AI output for $name (see $GEN_DIR/gen.log) — skipped"
