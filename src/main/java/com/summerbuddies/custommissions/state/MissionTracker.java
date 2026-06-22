@@ -3,6 +3,7 @@ package com.summerbuddies.custommissions.state;
 import com.summerbuddies.custommissions.Constants;
 import com.summerbuddies.custommissions.mission.Mission;
 import com.summerbuddies.custommissions.mission.MissionManager;
+import com.summerbuddies.custommissions.net.MissionSync;
 import com.summerbuddies.custommissions.reward.Reward;
 import com.summerbuddies.custommissions.reward.RewardContext;
 import com.summerbuddies.custommissions.waypoint.WaypointService;
@@ -46,6 +47,7 @@ public final class MissionTracker {
         for (var o : m.objectives()) {
             player.sendSystemMessage(Component.literal("  • " + o.describe()).withStyle(ChatFormatting.YELLOW));
         }
+        MissionSync.send(player);
         return true;
     }
 
@@ -65,6 +67,7 @@ public final class MissionTracker {
             player.sendSystemMessage(Component.literal("Mission complete: " + m.title())
                     .withStyle(ChatFormatting.GREEN));
         }
+        MissionSync.send(player);
     }
 
     /** Drop an active mission and remove its waypoint. */
@@ -76,6 +79,7 @@ public final class MissionTracker {
         pm.abandon(id);
         PlayerMissionStore.put(player, pm);
         WaypointService.remove(player, id);
+        MissionSync.send(player);
         return true;
     }
 
@@ -100,6 +104,7 @@ public final class MissionTracker {
         }
         if (expired > 0) {
             PlayerMissionStore.put(player, pm);
+            MissionSync.send(player);
         }
         return expired;
     }

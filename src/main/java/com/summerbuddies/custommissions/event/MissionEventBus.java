@@ -2,6 +2,7 @@ package com.summerbuddies.custommissions.event;
 
 import com.summerbuddies.custommissions.mission.Mission;
 import com.summerbuddies.custommissions.mission.MissionManager;
+import com.summerbuddies.custommissions.net.MissionSync;
 import com.summerbuddies.custommissions.objective.Objective;
 import com.summerbuddies.custommissions.state.MissionTracker;
 import com.summerbuddies.custommissions.state.PlayerMissionStore;
@@ -76,7 +77,10 @@ public final class MissionEventBus {
             PlayerMissionStore.put(player, pm);
         }
         for (Mission m : completedNow) {
-            MissionTracker.complete(player, m);
+            MissionTracker.complete(player, m); // pushes its own snapshot
+        }
+        if (changed && completedNow.isEmpty()) {
+            MissionSync.send(player); // progress without completion still refreshes the screen
         }
     }
 

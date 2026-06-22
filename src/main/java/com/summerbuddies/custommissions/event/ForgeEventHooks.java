@@ -135,6 +135,7 @@ public final class ForgeEventHooks {
             MissionTracker.expireDailies(player);
             DailyIngestTask.ingest(player);
             refreshWaypoints(player);
+            com.summerbuddies.custommissions.net.MissionSync.send(player);
         }
     }
 
