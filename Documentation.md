@@ -83,7 +83,7 @@ warns and is skipped (the mission still loads), and every numeric field defaults
 
 | type | advances on | key fields |
 |---|---|---|
-| `kill_entity` | player kill (direct or pet/projectile) | `entity` (id or `#tag`), `count` |
+| `kill_entity` | player kill (direct or pet/projectile) | `entity` (id or `#tag`), `count`. Summoned minions are excluded (scoreboard tag contains "summon", e.g. `cc_summon`). |
 | `collect_item` | item pickup | `item`, `count` |
 | `reach_location` | position sample | `dimension`,`x`,`y`,`z`,`radius`,`waypoint`,`waypointColor` |
 | `talk_to_npc` | interact with an `easy_npc:*` entity | `npcUuid` and/or `npcName` |

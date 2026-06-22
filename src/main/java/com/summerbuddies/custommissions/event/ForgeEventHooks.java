@@ -58,6 +58,9 @@ public final class ForgeEventHooks {
             return;
         }
         LivingEntity dead = event.getEntity();
+        if (isSummon(dead)) {
+            return; // never count a summoner's minions toward kill objectives (no farming your own summons)
+        }
         ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(dead.getType());
         if (id == null) {
             return;
@@ -65,6 +68,21 @@ public final class ForgeEventHooks {
         Set<ResourceLocation> tags = dead.getType().builtInRegistryHolder().tags()
                 .map(TagKey::location).collect(Collectors.toSet());
         MissionEventBus.dispatch(player, new MissionEvent.Kill(id, tags));
+    }
+
+    /**
+     * A summoned minion (of ANY summoner) — excluded from kill_entity. Detected by scoreboard tag: Custom
+     * Companions stamps its summoner minions with {@code cc_summon} (SummonGuard.SUMMON_TAG, persistent), and
+     * many mods tag summons with a name containing "summon". Reads scoreboard tags only, so it needs no
+     * dependency on those mods.
+     */
+    private static boolean isSummon(Entity entity) {
+        for (String tag : entity.getTags()) {
+            if (tag.toLowerCase(java.util.Locale.ROOT).contains("summon")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @SubscribeEvent

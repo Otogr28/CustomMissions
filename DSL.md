@@ -43,7 +43,7 @@ fields. `description` shows in the tracker; `count` defaults to 1.
 
 | type | fields | meaning |
 |---|---|---|
-| `kill_entity` | `entity`, `count` | kill N of an entity id, or any in a tag if `entity` starts with `#`. |
+| `kill_entity` | `entity`, `count` | kill N of an entity id, or any in a tag if `entity` starts with `#`. Summoned minions never count (any entity with a scoreboard tag containing "summon", e.g. Custom Companions' `cc_summon`). |
 | `collect_item` | `item`, `count` | pick up N of an item. |
 | `reach_location` | `dimension`,`x`,`y`,`z`,`radius`,`waypoint`,`waypointColor` | go within `radius` (default 6) of a point. Drives the on-screen marker. |
 | `talk_to_npc` | `npcUuid` and/or `npcName` | interact with that EasyNPC. |
