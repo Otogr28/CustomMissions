@@ -44,11 +44,17 @@ public final class ClientMissions {
         return TRACKED.contains(missionId);
     }
 
-    /** Toggle whether a mission shows in the left HUD. */
+    /** Toggle whether a mission shows in the left HUD, the compass marker, AND the JourneyMap waypoint. */
     public static void toggleTracked(String missionId) {
         if (!TRACKED.remove(missionId)) {
             TRACKED.add(missionId);
         }
+        syncMarkerJm(missionId);
+    }
+
+    /** True only for markers of tracked missions (compass overlay filters on this). */
+    public static boolean markerVisible(String missionId) {
+        return TRACKED.contains(missionId);
     }
 
     // ---- markers ---------------------------------------------------------------------------------
@@ -69,7 +75,38 @@ public final class ClientMissions {
         BlockPos pos = new BlockPos(p.x(), p.y(), p.z());
         MARKERS.put(p.missionId(), new Marker(p.missionId(), dim, pos, p.name(), p.rgb()));
         if (jm) {
-            JourneyMapBridge.sync(p.missionId(), p.name(), dim, pos, p.rgb());
+            if (isTracked(p.missionId())) {
+                JourneyMapBridge.sync(p.missionId(), p.name(), dim, pos, p.rgb());
+            } else {
+                JourneyMapBridge.remove(p.missionId());
+            }
+        }
+    }
+
+    /** Show/hide a mission's JourneyMap waypoint to match its tracked state (called on toggle). */
+    private static void syncMarkerJm(String missionId) {
+        if (!ModList.get().isLoaded("journeymap")) {
+            return;
+        }
+        Marker m = MARKERS.get(missionId);
+        if (m != null && isTracked(missionId)) {
+            JourneyMapBridge.sync(missionId, m.name(), m.dimension(), m.pos(), m.rgb());
+        } else {
+            JourneyMapBridge.remove(missionId);
+        }
+    }
+
+    /** Reconcile every marker's JourneyMap waypoint with its tracked state (after a snapshot/auto-track). */
+    private static void syncAllMarkersJm() {
+        if (!ModList.get().isLoaded("journeymap")) {
+            return;
+        }
+        for (Marker m : MARKERS.values()) {
+            if (isTracked(m.missionId())) {
+                JourneyMapBridge.sync(m.missionId(), m.name(), m.dimension(), m.pos(), m.rgb());
+            } else {
+                JourneyMapBridge.remove(m.missionId());
+            }
         }
     }
 
@@ -99,6 +136,7 @@ public final class ClientMissions {
     public static void applySnapshot(MissionSyncS2C s) {
         snapshot = s;
         autoTrack(s);
+        syncAllMarkersJm();
         Minecraft mc = Minecraft.getInstance();
         if (openRequested) {
             openRequested = false;

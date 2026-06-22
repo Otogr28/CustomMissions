@@ -45,7 +45,7 @@ public final class MarkerOverlay {
 
         int y = (int) (height * 0.06f);
         for (ClientMissions.Marker m : ClientMissions.markers()) {
-            if (!m.dimension().equals(currentDim)) {
+            if (!m.dimension().equals(currentDim) || !ClientMissions.markerVisible(m.missionId())) {
                 continue;
             }
             double dx = (m.pos().getX() + 0.5) - pos.x;
