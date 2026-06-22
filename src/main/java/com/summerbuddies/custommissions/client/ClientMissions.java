@@ -24,9 +24,19 @@ public final class ClientMissions {
     private static final MissionSyncS2C EMPTY = new MissionSyncS2C(List.of(), List.of(), List.of());
 
     private static volatile MissionSyncS2C snapshot = EMPTY;
+    private static volatile String trackedId;
     private static boolean openRequested;
 
     private ClientMissions() {}
+
+    /** The mission highlighted/expanded in the left HUD (chosen via the screen's Track button). */
+    public static String trackedId() {
+        return trackedId;
+    }
+
+    public static void setTracked(String id) {
+        trackedId = id;
+    }
 
     // ---- markers ---------------------------------------------------------------------------------
 
@@ -49,6 +59,7 @@ public final class ClientMissions {
     public static void clear() {
         MARKERS.clear();
         snapshot = EMPTY;
+        trackedId = null;
     }
 
     // ---- missions snapshot -----------------------------------------------------------------------

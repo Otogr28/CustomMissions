@@ -52,6 +52,8 @@ public final class MissionsScreen extends Screen {
     private final int[] tabEnd = new int[3];
     private int btnX, btnY, btnW, btnH;
     private boolean btnActive;
+    private int trkX, trkY, trkW, trkH;
+    private boolean trkActive;
 
     public MissionsScreen() {
         super(Component.literal("Adventure Log"));
@@ -253,21 +255,45 @@ public final class MissionsScreen extends Screen {
             }
         }
 
-        // action button (bottom of detail panel)
-        if (tab == Tab.AVAILABLE || tab == Tab.ACTIVE) {
-            String label = tab == Tab.AVAILABLE ? "Accept" : "Abandon";
-            btnW = 80;
-            btnH = 18;
-            btnX = detailX + detailW - 10 - btnW;
-            btnY = contentBottom - 10 - btnH;
+        // action buttons (bottom of detail panel)
+        btnActive = false;
+        trkActive = false;
+        int bw = 78;
+        int bh = 18;
+        int by = contentBottom - 10 - bh;
+        if (tab == Tab.AVAILABLE) {
+            btnX = detailX + detailW - 10 - bw;
+            btnY = by;
+            btnW = bw;
+            btnH = bh;
             btnActive = true;
-            boolean hover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-            int border = tab == Tab.AVAILABLE ? GOLD : 0xFFD18A8A;
-            g.fill(btnX, btnY, btnX + btnW, btnY + btnH, hover ? 0x50E8C170 : 0x30FFFFFF);
-            outline(g, btnX, btnY, btnW, btnH, border);
-            int lw = font.width(label);
-            g.drawString(font, label, btnX + (btnW - lw) / 2, btnY + (btnH - 8) / 2, hover ? GOLD : TEXT, false);
+            drawBtn(g, font, btnX, btnY, btnW, btnH, "Accept", GOLD, mouseX, mouseY);
+        } else if (tab == Tab.ACTIVE) {
+            btnX = detailX + detailW - 10 - bw;
+            btnY = by;
+            btnW = bw;
+            btnH = bh;
+            btnActive = true;
+            drawBtn(g, font, btnX, btnY, btnW, btnH, "Abandon", 0xFFD18A8A, mouseX, mouseY);
+
+            boolean isTracked = e.id().equals(ClientMissions.trackedId());
+            trkX = btnX - 8 - bw;
+            trkY = by;
+            trkW = bw;
+            trkH = bh;
+            trkActive = true;
+            drawBtn(g, font, trkX, trkY, trkW, trkH, isTracked ? "Tracked" : "Track",
+                    isTracked ? DONE : GOLD, mouseX, mouseY);
         }
+    }
+
+    private void drawBtn(GuiGraphics g, Font font, int x, int y, int w, int h, String label, int border,
+                         int mouseX, int mouseY) {
+        boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+        g.fill(x, y, x + w, y + h, hover ? 0x50E8C170 : 0x30FFFFFF);
+        outline(g, x, y, w, h, border);
+        int lw = font.width(label);
+        g.drawString(font, label, x + (w - lw) / 2, y + (h - 8) / 2, hover ? GOLD : TEXT, false);
     }
 
     // ---- input -----------------------------------------------------------------------------------
@@ -294,7 +320,13 @@ public final class MissionsScreen extends Screen {
                     return true;
                 }
             }
-            // action button
+            // track button (active tab) — client-side highlight, no server round-trip
+            if (trkActive && mx >= trkX && mx <= trkX + trkW && my >= trkY && my <= trkY + trkH
+                    && selected < list.size()) {
+                ClientMissions.setTracked(list.get(selected).id());
+                return true;
+            }
+            // accept / abandon
             if (btnActive && mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH
                     && selected < list.size()) {
                 String id = list.get(selected).id();
