@@ -24,3 +24,6 @@ run-data
 
 # Files from Forge MDK
 forge*changelog.txt
+
+# dev status notes — local only
+STATUS.md
