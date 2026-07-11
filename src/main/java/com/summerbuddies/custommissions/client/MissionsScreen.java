@@ -54,6 +54,9 @@ public final class MissionsScreen extends Screen {
     private boolean btnActive;
     private int trkX, trkY, trkW, trkH;
     private boolean trkActive;
+    // HUD-size drag bar (top-right, above the detail panel)
+    private int sldX, sldY, sldW, sldH;
+    private boolean draggingSld;
 
     public MissionsScreen() {
         super(Component.literal("Adventure Log"));
@@ -111,12 +114,18 @@ public final class MissionsScreen extends Screen {
         renderBackground(g);
         Font font = this.font;
 
+        // lay out the top-right header (HUD-size slider + action buttons) for the current tab/selection
+        layoutHeader();
+
         // title
         g.drawString(font, "ADVENTURE LOG", listX, 18, GOLD, false);
         g.drawString(font, "Missions", listX, 30, DIM, false);
 
-        // tabs (top-right of the list area)
+        // tabs (under the title, left column)
         renderTabs(g, font, mouseX, mouseY);
+
+        // HUD-size drag bar + action buttons (top of the detail column, above the panels)
+        renderHudSlider(g, font, mouseX, mouseY);
 
         // panels
         panel(g, listX, contentTop, listW, contentBottom - contentTop);
@@ -124,9 +133,53 @@ public final class MissionsScreen extends Screen {
 
         renderList(g, font, mouseX, mouseY);
         renderDetail(g, font, mouseX, mouseY);
+        renderActions(g, font, mouseX, mouseY);
 
         // footer hint
         g.drawString(font, "M / Esc to close", listX, height - 12, DIM, false);
+    }
+
+    /**
+     * Lays out the detail-column header (top-right): the HUD-size slider on the left and the action
+     * buttons (Track / Abandon, or Accept) on the right, all on one row <b>above</b> the tab line so
+     * neither the overflowing tabs nor the long detail content can overlap them.
+     */
+    private void layoutHeader() {
+        List<MissionSyncS2C.Entry> list = current();
+        boolean hasSel = !list.isEmpty() && selected < list.size();
+        int headerRight = detailX + detailW;
+        int by = 18;
+        int bh = 16;
+        int bw = 64;
+        btnActive = false;
+        trkActive = false;
+        int sliderRight = headerRight; // shrinks as buttons claim space on the right
+
+        if (hasSel && tab == Tab.AVAILABLE) {
+            btnX = headerRight - bw;
+            btnY = by;
+            btnW = bw;
+            btnH = bh;
+            btnActive = true;
+            sliderRight = btnX - 10;
+        } else if (hasSel && tab == Tab.ACTIVE) {
+            btnX = headerRight - bw;        // Abandon (rightmost)
+            btnY = by;
+            btnW = bw;
+            btnH = bh;
+            btnActive = true;
+            trkX = btnX - 6 - bw;           // Track (left of Abandon)
+            trkY = by;
+            trkW = bw;
+            trkH = bh;
+            trkActive = true;
+            sliderRight = trkX - 10;
+        }
+
+        sldX = detailX;
+        sldY = 28;
+        sldH = 5;
+        sldW = Math.max(40, sliderRight - detailX);
     }
 
     private void renderTabs(GuiGraphics g, Font font, int mouseX, int mouseY) {
@@ -187,7 +240,6 @@ public final class MissionsScreen extends Screen {
     }
 
     private void renderDetail(GuiGraphics g, Font font, int mouseX, int mouseY) {
-        btnActive = false;
         List<MissionSyncS2C.Entry> list = current();
         int x = detailX + 10;
         int w = detailW - 20;
@@ -254,36 +306,26 @@ public final class MissionsScreen extends Screen {
                 y += 11;
             }
         }
+    }
 
-        // action buttons (bottom of detail panel)
-        btnActive = false;
-        trkActive = false;
-        int bw = 78;
-        int bh = 18;
-        int by = contentBottom - 10 - bh;
-        if (tab == Tab.AVAILABLE) {
-            btnX = detailX + detailW - 10 - bw;
-            btnY = by;
-            btnW = bw;
-            btnH = bh;
-            btnActive = true;
-            drawBtn(g, font, btnX, btnY, btnW, btnH, "Accept", GOLD, mouseX, mouseY);
-        } else if (tab == Tab.ACTIVE) {
-            btnX = detailX + detailW - 10 - bw;
-            btnY = by;
-            btnW = bw;
-            btnH = bh;
-            btnActive = true;
-            drawBtn(g, font, btnX, btnY, btnW, btnH, "Abandon", 0xFFD18A8A, mouseX, mouseY);
-
+    /** Draws the action buttons in the detail-column header (positions are set by {@link #layoutHeader()}). */
+    private void renderActions(GuiGraphics g, Font font, int mouseX, int mouseY) {
+        List<MissionSyncS2C.Entry> list = current();
+        if (list.isEmpty() || selected >= list.size()) {
+            return;
+        }
+        MissionSyncS2C.Entry e = list.get(selected);
+        if (trkActive) {
             boolean isTracked = ClientMissions.isTracked(e.id());
-            trkX = btnX - 8 - bw;
-            trkY = by;
-            trkW = bw;
-            trkH = bh;
-            trkActive = true;
             drawBtn(g, font, trkX, trkY, trkW, trkH, isTracked ? "Tracked" : "Track",
                     isTracked ? DONE : GOLD, mouseX, mouseY);
+        }
+        if (btnActive) {
+            if (tab == Tab.AVAILABLE) {
+                drawBtn(g, font, btnX, btnY, btnW, btnH, "Accept", GOLD, mouseX, mouseY);
+            } else if (tab == Tab.ACTIVE) {
+                drawBtn(g, font, btnX, btnY, btnW, btnH, "Abandon", 0xFFD18A8A, mouseX, mouseY);
+            }
         }
     }
 
@@ -301,6 +343,12 @@ public final class MissionsScreen extends Screen {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (button == 0) {
+            // HUD-size drag bar
+            if (mx >= sldX - 3 && mx <= sldX + sldW + 3 && my >= sldY - 5 && my <= sldY + sldH + 5) {
+                draggingSld = true;
+                updateSliderFromMouse(mx);
+                return true;
+            }
             // tabs
             for (int i = 0; i < 3; i++) {
                 if (mx >= tabStart[i] && mx <= tabEnd[i] && my >= 40 && my <= 50) {
@@ -348,10 +396,55 @@ public final class MissionsScreen extends Screen {
         return super.mouseScrolled(mx, my, delta);
     }
 
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (draggingSld && button == 0) {
+            updateSliderFromMouse(mx);
+            return true;
+        }
+        return super.mouseDragged(mx, my, button, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        if (draggingSld && button == 0) {
+            draggingSld = false;
+            MissionClientConfig.save(); // persist once, when the player lets go
+            return true;
+        }
+        return super.mouseReleased(mx, my, button);
+    }
+
     private void runCommand(String cmd) {
         if (minecraft != null && minecraft.player != null) {
             minecraft.player.connection.sendCommand(cmd);
         }
+    }
+
+    private void renderHudSlider(GuiGraphics g, Font font, int mouseX, int mouseY) {
+        float min = MissionClientConfig.MIN_SCALE;
+        float max = MissionClientConfig.MAX_SCALE;
+        float scale = MissionClientConfig.hudScale();
+        g.drawString(font, "HUD SIZE", sldX, 18, GOLD, false);
+        String val = String.format(java.util.Locale.ROOT, "%.2fx", scale);
+        g.drawString(font, val, sldX + sldW - font.width(val), 18, DIM, false);
+        g.fill(sldX, sldY, sldX + sldW, sldY + sldH, 0x40FFFFFF);
+        outline(g, sldX, sldY, sldW, sldH, PANEL_LINE);
+        int knobW = 6;
+        int knobX = sldX + Math.round((scale - min) / (max - min) * (sldW - knobW));
+        boolean hover = draggingSld
+                || (mouseX >= sldX - 3 && mouseX <= sldX + sldW + 3 && mouseY >= sldY - 5 && mouseY <= sldY + sldH + 5);
+        g.fill(knobX, sldY - 3, knobX + knobW, sldY + sldH + 3, hover ? GOLD : 0xFFD8C8A0);
+    }
+
+    private void updateSliderFromMouse(double mx) {
+        float min = MissionClientConfig.MIN_SCALE;
+        float max = MissionClientConfig.MAX_SCALE;
+        float frac = (float) ((mx - sldX) / Math.max(1, sldW));
+        frac = Math.max(0f, Math.min(1f, frac));
+        float scale = min + frac * (max - min);
+        scale = Math.round(scale / 0.05f) * 0.05f; // snap to 0.05 steps
+        MissionClientConfig.setHudScale(scale);
     }
 
     @Override

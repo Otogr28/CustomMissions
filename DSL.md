@@ -24,6 +24,7 @@ numeric field has a default. Reload at runtime with `/mission reload` — no res
 | `location` | object | no | headline marker `{dimension,x,y,z,radius,waypoint,waypointColor}`. |
 | `expiryHours` | int | daily only | hours before an accepted daily expires (default 24). |
 | `assignTo` | array | no | player names; informational. Dailies are owned by their folder's uuid. |
+| `autoAccept` | bool | no | if `true`, the mission is force-assigned the instant its `prerequisites` are met (no manual accept) — for important/story missions that must not be missed. Re-checked on login, dimension change, every ~30s, and right after any completion (so a chain's next link pops by itself). Default `false`. |
 
 ### prerequisites
 
@@ -71,6 +72,11 @@ Ids are namespaced resource locations (`minecraft:diamond`, `iceandfire:fire_dra
 
 Cross-mod rewards (`cutscene`, `unlock`, `companion`) are no-ops if that mod is absent.
 
+**Coins (economy).** Coins are plain items (Lightman's Currency), so reward them with `item`:
+`lightmanscurrency:coin_copper` < `coin_iron` < `coin_gold` < `coin_emerald` < `coin_diamond` <
+`coin_netherite`. Coins are admin/quest-only (not craftable from materials), so missions are a primary way
+players earn money. Dailies lean copper/iron; reserve higher tiers for primary-chain milestones.
+
 ## Examples
 
 ### Daily (AI-authored, expires)
@@ -79,21 +85,22 @@ Cross-mod rewards (`cutscene`, `unlock`, `companion`) are no-ops if that mod is 
 {
   "id": "daily_2026-06-21_LUCARDGO_01",
   "category": "daily",
-  "title": "Embers in the Waste",
-  "description": "The Traveler senses heat near the old spire. Cull what crawls there.",
-  "lore": "Sand remembers every fire it has swallowed.",
+  "title": "The Hounds at Dusk",
+  "description": "Something restless prowls the wastes of v1. Thin the pack before it grows bold.",
+  "lore": "Aincrad's dark does not wait for the brave to be ready.",
   "giver": { "npcUuid": "d48a3f45-0efd-46c6-9803-5e1256d95d33", "npcName": "the-traveler" },
   "assignTo": ["LUCARDGO"],
   "expiryHours": 24,
   "prerequisites": { "loreStage": 1 },
   "objectives": [
-    { "type": "kill_entity", "entity": "iceandfire:fire_dragon", "count": 1, "description": "Slay a fire drake" },
-    { "type": "reach_location", "dimension": "realmgates:heatdeath", "x": 120, "y": 90, "z": -340,
+    { "type": "kill_entity", "entity": "born_in_chaos_v1:dread_hound", "count": 3, "description": "Slay dread hounds in v1" },
+    { "type": "reach_location", "dimension": "realmgates:v1", "x": 120, "y": 90, "z": -340,
       "radius": 6, "waypoint": "Old Spire", "waypointColor": "#E8C170", "description": "Reach the Old Spire" }
   ],
   "rewards": [
-    { "type": "item", "item": "minecraft:diamond", "count": 3 },
-    { "type": "xp", "amount": 200 }
+    { "type": "command", "command": "xp add {player} 1 levels" },
+    { "type": "item", "item": "lightmanscurrency:coin_copper", "count": 1 },
+    { "type": "item", "item": "lightmanscurrency:coin_iron", "count": 1 }
   ],
   "onComplete": [ { "type": "cutscene", "script": "daily_reward_flash" } ]
 }
@@ -147,8 +154,11 @@ Cross-mod rewards (`cutscene`, `unlock`, `companion`) are no-ops if that mod is 
 
 ## Authoring rules of thumb (for the AI brain)
 
-- Only use entity/item/dimension/block ids that exist on this server (see `state/world_state.json →
-  knownDimensions` and the allowed-id list given in `agent/PROMPT.md`).
+- Only use entity/item/dimension/block ids that exist on this server. The brain is fed `agent/CATALOG.md`
+  (the real modded ids: which mobs are WILD vs boss/structure-only, gather items, structures, coins) plus
+  `state/world_state.json → knownDimensions`. Never invent a modded id.
+- Vary the objective types and lean modded: don't write three kill/reach dailies of vanilla mobs. Mix
+  combat/explore/build/gather/deliver/use, and only `kill_entity` a mob CATALOG marks WILD.
 - Respect each player's `loreStage`; never reference incomplete primary-chain steps.
 - Keep dailies achievable in one session: small counts, nearby locations, the dimensions the player can
   reach. Lean on the player's recent stats/dimension from `state/context/<uuid>.json`.

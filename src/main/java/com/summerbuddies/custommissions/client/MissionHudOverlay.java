@@ -1,5 +1,6 @@
 package com.summerbuddies.custommissions.client;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.summerbuddies.custommissions.Constants;
 import com.summerbuddies.custommissions.net.MissionSyncS2C;
 import net.minecraft.client.Minecraft;
@@ -76,6 +77,14 @@ public final class MissionHudOverlay {
         int x = 6;
         int y = Math.max(30, height / 2 - totalH / 2);
 
+        // Player-set HUD scale, pivoted on the left edge at mid-height so it stays left-anchored + centered.
+        float s = MissionClientConfig.hudScale();
+        PoseStack pose = g.pose();
+        pose.pushPose();
+        pose.translate(x, height / 2.0, 0);
+        pose.scale(s, s, 1f);
+        pose.translate(-x, -(height / 2.0), 0);
+
         g.fill(x - 4, y - 4, x + maxW + 4, y + totalH - 4, 0x73000000);
         g.fill(x - 4, y - 4, x - 2, y + totalH - 4, 0xC0E8C170); // gold accent bar
 
@@ -84,6 +93,7 @@ public final class MissionHudOverlay {
             g.drawString(font, l.text, x, cy, l.color, true);
             cy += lineH;
         }
+        pose.popPose();
     }
 
     private record Line(String text, int color) {}

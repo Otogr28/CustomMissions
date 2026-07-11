@@ -13,12 +13,14 @@ import java.util.UUID;
  * ordered {@link Objective}s, the {@link Reward}s granted on complete, and the on-accept hooks. Built from
  * a {@code json.MissionDto} by {@code MissionManager}. Daily missions additionally carry an {@code owner}
  * (the player whose {@code daily/<date>/<uuid>/} dir they were dropped in) and an {@code expirySeconds}.
+ * When {@code autoAccept} is set, the mission is forced onto a player the moment its prerequisites are met
+ * (no manual accept) — used for important/story missions that must not be missed.
  */
 public record Mission(String id, MissionCategory category, String title, String description, String lore,
                       Giver giver, Prerequisites prerequisites, List<Objective> objectives,
                       List<Reward> rewards, List<Reward> onAccept, List<Reward> onComplete,
                       @Nullable MissionLocation location, long expirySeconds,
-                      @Nullable UUID owner, Set<String> assignTo) {
+                      @Nullable UUID owner, Set<String> assignTo, boolean autoAccept) {
 
     public boolean isDaily() {
         return category == MissionCategory.DAILY;

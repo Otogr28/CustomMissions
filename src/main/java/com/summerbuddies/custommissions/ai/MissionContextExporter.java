@@ -6,6 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.summerbuddies.custommissions.Constants;
 import com.summerbuddies.custommissions.mission.MissionManager;
+import com.summerbuddies.custommissions.state.GossipLedger;
 import com.summerbuddies.custommissions.state.LoreState;
 import com.summerbuddies.custommissions.state.PlayerMissionStore;
 import com.summerbuddies.custommissions.state.PlayerMissions;
@@ -50,6 +51,17 @@ public final class MissionContextExporter {
         JsonObject p = new JsonObject();
         p.addProperty("uuid", player.getUUID().toString());
         p.addProperty("name", player.getGameProfile().getName());
+        if (pm.hasDescription()) {
+            p.addProperty("description", pm.description());
+        }
+        GossipLedger gl = GossipLedger.get(player.serverLevel());
+        p.addProperty("gossipBias", gl.bias(player.getUUID()));
+        java.util.List<String> rumors = gl.rumors(player.getUUID());
+        if (!rumors.isEmpty()) {
+            JsonArray ra = new JsonArray();
+            for (String s : rumors) ra.add(s);
+            p.add("rumors", ra);
+        }
         root.add("player", p);
 
         root.addProperty("generatedAt", Instant.now().toString());

@@ -17,5 +17,6 @@ public final class MissionDto {
     public Integer expiryHours;   // daily missions only
     public List<RewardDto> onAccept;
     public List<RewardDto> onComplete;
-    public List<String> assignTo; // optional explicit player names
+    public List<String> assignTo;   // optional explicit player names
+    public Boolean autoAccept;      // if true, auto-assign to a player as soon as prerequisites are met
 }

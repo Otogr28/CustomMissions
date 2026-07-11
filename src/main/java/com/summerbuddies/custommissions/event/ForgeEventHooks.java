@@ -114,9 +114,6 @@ public final class ForgeEventHooks {
             return;
         }
         if (EasyNpcBridge.isNpc(target)) {
-            // Temporary diagnostic (remove in M2 cleanup): confirms the event fires + the NPC's real name/uuid.
-            Constants.LOG.info("[custommissions] npc interact by {} -> name='{}' uuid={}",
-                    sp.getGameProfile().getName(), EasyNpcBridge.npcName(target), EasyNpcBridge.npcUuid(target));
             MissionEventBus.dispatch(sp,
                     new MissionEvent.NpcTalk(EasyNpcBridge.npcUuid(target), EasyNpcBridge.npcName(target)));
         }
@@ -126,6 +123,7 @@ public final class ForgeEventHooks {
     public static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             MissionEventBus.dispatch(player, new MissionEvent.EnterDim(event.getTo().location()));
+            MissionTracker.autoAssignAvailable(player); // a dimension-gated story mission may unlock here
         }
     }
 
@@ -159,15 +157,38 @@ public final class ForgeEventHooks {
         }
     }
 
+    // LOWEST + receiveCanceled: the chat-translation mod (voicetrans) CANCELS ServerChatEvent to re-send
+    // translated copies, so a plain listener never sees it. We only observe (read the raw text), so running
+    // last and on cancelled events too is both safe and necessary.
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOWEST, receiveCanceled = true)
+    public static void onServerChat(net.minecraftforge.event.ServerChatEvent event) {
+        // Always-listening Traveler: any "traveler" mention in public chat (rate-limited) triggers an
+        // in-character reply broadcast to everyone.
+        com.summerbuddies.custommissions.ai.TravelerChat.onPublicChat(event.getPlayer(), event.getRawText());
+    }
+
     // ---- lifecycle -------------------------------------------------------------------------------
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            com.summerbuddies.custommissions.state.KnownPlayers.get(player.serverLevel())
+                    .record(player.getUUID(), player.getGameProfile().getName());
             MissionTracker.expireDailies(player);
             DailyIngestTask.ingest(player);
+            MissionTracker.autoAssignAvailable(player); // force important/story missions whose prereqs are met
             refreshWaypoints(player);
             com.summerbuddies.custommissions.net.MissionSync.send(player);
+            // First-run (and every login until submitted): ask the player to describe themselves so the AI
+            // can tailor their missions. The draft (if any) is restored; the client defers the actual popup.
+            PlayerMissions pm = PlayerMissionStore.get(player);
+            if (!pm.hasDescription()) {
+                com.summerbuddies.custommissions.net.MissionNet.toPlayer(player,
+                        new com.summerbuddies.custommissions.net.OpenDescribeS2C(pm.draftDescription(), true));
+            } else {
+                // Established player (already described) → mark the intro as seen so re-editing never replays it.
+                com.summerbuddies.custommissions.intro.IntroCutscene.markSeenIfEstablished(player);
+            }
         }
     }
 
@@ -183,6 +204,7 @@ public final class ForgeEventHooks {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        com.summerbuddies.custommissions.ai.TravelerChat.poll(event.getServer()); // cheap no-op when idle
         if (++tickCounter < HOUSEKEEP_INTERVAL) {
             return;
         }
@@ -191,6 +213,7 @@ public final class ForgeEventHooks {
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             MissionTracker.expireDailies(player);
             DailyIngestTask.ingest(player);
+            MissionTracker.autoAssignAvailable(player); // catch prereqs met via flags/lore-stage over time
             MissionContextExporter.export(player);
         }
     }

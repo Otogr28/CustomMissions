@@ -37,5 +37,7 @@ public final class MissionKeybind {
                 MissionNet.toServer(new RequestMissionsC2S());
             }
         }
+        ClientMissions.pollDescribe(mc);
+        TravelerClient.pollOpen(mc);
     }
 }

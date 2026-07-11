@@ -14,6 +14,11 @@ import com.summerbuddies.custommissions.mission.LoadResult;
 import com.summerbuddies.custommissions.mission.Mission;
 import com.summerbuddies.custommissions.mission.MissionLocation;
 import com.summerbuddies.custommissions.mission.MissionManager;
+import com.summerbuddies.custommissions.net.MissionNet;
+import com.summerbuddies.custommissions.net.OpenDescribeS2C;
+import com.summerbuddies.custommissions.net.OpenGossipS2C;
+import com.summerbuddies.custommissions.net.OpenTravelerChatS2C;
+import com.summerbuddies.custommissions.state.KnownPlayers;
 import com.summerbuddies.custommissions.objective.Objective;
 import com.summerbuddies.custommissions.state.LoreState;
 import com.summerbuddies.custommissions.state.MissionTracker;
@@ -67,6 +72,8 @@ public final class MissionCommand {
                 .then(Commands.argument("id", StringArgumentType.string())
                         .suggests((c, b) -> SharedSuggestionProvider.suggest(activeIds(c.getSource()), b))
                         .executes(ctx -> abandon(ctx.getSource(), StringArgumentType.getString(ctx, "id")))));
+
+        root.then(Commands.literal("describe").executes(ctx -> describe(ctx.getSource())));
 
         // ---- signal (perm 0: KubeJS/EasyNPC emit it) ----
         root.then(Commands.literal("signal")
@@ -134,7 +141,51 @@ public final class MissionCommand {
                                 .executes(ctx -> exportPlayers(ctx.getSource(),
                                         EntityArgument.getPlayers(ctx, "players"))))));
 
+        // NPC-triggered entry points (perm 2). The EasyNPC dialogue button runs e.g. `mission gossip @initiator`
+        // (COMMAND action, ExecAsUser=false, PermLevel=2): it runs as the server but TARGETS the player who
+        // interacted, passed as the argument (EasyNPC substitutes @initiator with their name). The no-arg form
+        // (an op typing it) targets themselves. There is no player-facing /traveler anymore.
+        root.then(Commands.literal("gossip").requires(op())
+                .executes(ctx -> openGossip(ctx.getSource(), selfPlayer(ctx.getSource())))
+                .then(Commands.argument("player", EntityArgument.player())
+                        .executes(ctx -> openGossip(ctx.getSource(), EntityArgument.getPlayer(ctx, "player")))));
+        root.then(Commands.literal("flugel").requires(op())
+                .executes(ctx -> openFlugel(ctx.getSource(), selfPlayer(ctx.getSource())))
+                .then(Commands.argument("player", EntityArgument.player())
+                        .executes(ctx -> openFlugel(ctx.getSource(), EntityArgument.getPlayer(ctx, "player")))));
+
         dispatcher.register(root);
+    }
+
+    private static int openGossip(CommandSourceStack src, ServerPlayer target) {
+        if (target == null) {
+            src.sendFailure(Component.literal("Specify a player (the gossip button passes @initiator)."));
+            return 0;
+        }
+        java.util.List<OpenGossipS2C.Target> roster = new java.util.ArrayList<>();
+        roster.add(new OpenGossipS2C.Target(target.getUUID().toString(), target.getGameProfile().getName()));
+        for (KnownPlayers.Entry e : KnownPlayers.get(target.serverLevel()).all()) {
+            if (!e.uuid().equals(target.getUUID())) {
+                roster.add(new OpenGossipS2C.Target(e.uuid().toString(), e.name()));
+            }
+        }
+        MissionNet.toPlayer(target, new OpenGossipS2C(roster));
+        return 1;
+    }
+
+    private static int openFlugel(CommandSourceStack src, ServerPlayer target) {
+        if (target == null) {
+            src.sendFailure(Component.literal("Specify a player (the Flugel button passes @initiator)."));
+            return 0;
+        }
+        MissionNet.toPlayer(target, new OpenTravelerChatS2C(
+                "Ah — you found me. Speak your mind, wanderer. What do you seek?"));
+        return 1;
+    }
+
+    @Nullable
+    private static ServerPlayer selfPlayer(CommandSourceStack src) {
+        return src.getEntity() instanceof ServerPlayer p ? p : null;
     }
 
     // ---- player-facing -------------------------------------------------------------------------
@@ -224,6 +275,15 @@ public final class MissionCommand {
         }
         src.sendFailure(Component.literal("That mission isn't active."));
         return 0;
+    }
+
+    private static int describe(CommandSourceStack src) {
+        ServerPlayer self = playerOrFail(src);
+        if (self == null) return 0;
+        PlayerMissions pm = PlayerMissionStore.get(self);
+        String text = pm.hasDescription() ? pm.description() : pm.draftDescription();
+        MissionNet.toPlayer(self, new OpenDescribeS2C(text, !pm.hasDescription()));
+        return 1;
     }
 
     // ---- signal ----------------------------------------------------------------------------------

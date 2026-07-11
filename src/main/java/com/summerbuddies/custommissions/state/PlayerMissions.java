@@ -27,6 +27,13 @@ public final class PlayerMissions {
     private final Set<String> claimed = new LinkedHashSet<>();
     private final Set<String> expired = new LinkedHashSet<>();
 
+    /** Player's self-description (final, submitted) — feeds the AI mission brain. */
+    private String description = "";
+    /** In-progress self-description kept across an accidental close, until the player submits. */
+    private String draftDescription = "";
+    /** One-shot guard: has the brand-new-player intro cutscene already been played for this player? */
+    private boolean introCinematicPlayed = false;
+
     // ---- queries ---------------------------------------------------------------------------------
 
     public boolean isActive(String id) { return active.contains(id); }
@@ -49,6 +56,11 @@ public final class PlayerMissions {
         return acceptedAt.getOrDefault(id, 0L);
     }
 
+    public String description() { return description; }
+    public boolean hasDescription() { return !description.isBlank(); }
+    public String draftDescription() { return draftDescription; }
+    public boolean introCinematicPlayed() { return introCinematicPlayed; }
+
     // ---- mutations -------------------------------------------------------------------------------
 
     /** Accept a mission, PRESERVING any prior progress (resized if the objective count changed). */
@@ -69,6 +81,10 @@ public final class PlayerMissions {
     public void setCounters(String id, int[] values) {
         progress.put(id, values.clone());
     }
+
+    public void setDescription(String d) { this.description = d == null ? "" : d; }
+    public void setDraftDescription(String d) { this.draftDescription = d == null ? "" : d; }
+    public void setIntroCinematicPlayed(boolean played) { this.introCinematicPlayed = played; }
 
     public void complete(String id) {
         active.remove(id);
@@ -111,6 +127,9 @@ public final class PlayerMissions {
         tag.put("Completed", strings(completed));
         tag.put("Claimed", strings(claimed));
         tag.put("Expired", strings(expired));
+        if (!description.isEmpty()) tag.putString("Description", description);
+        if (!draftDescription.isEmpty()) tag.putString("DraftDescription", draftDescription);
+        if (introCinematicPlayed) tag.putBoolean("IntroCinematicPlayed", true);
         return tag;
     }
 
@@ -128,6 +147,9 @@ public final class PlayerMissions {
         readStrings(tag, "Completed", p.completed);
         readStrings(tag, "Claimed", p.claimed);
         readStrings(tag, "Expired", p.expired);
+        p.description = tag.getString("Description");
+        p.draftDescription = tag.getString("DraftDescription");
+        p.introCinematicPlayed = tag.getBoolean("IntroCinematicPlayed");
         // Backward-compat: older saves stored counters under "Active" as compounds; if Active came back
         // empty but Progress has entries, treat all progressed missions as active (best-effort migration).
         if (p.active.isEmpty() && !p.progress.isEmpty()) {

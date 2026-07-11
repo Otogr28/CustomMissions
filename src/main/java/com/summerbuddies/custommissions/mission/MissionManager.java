@@ -252,9 +252,10 @@ public final class MissionManager {
             expirySeconds = hours * 3600L;
         }
         Set<String> assignTo = dto.assignTo != null ? new LinkedHashSet<>(dto.assignTo) : Set.of();
+        boolean autoAccept = dto.autoAccept != null && dto.autoAccept;
 
         return new Mission(id, category, title(dto), nz(dto.description), nz(dto.lore), giver, prereq,
-                objectives, rewards, onAccept, onComplete, location, expirySeconds, owner, assignTo);
+                objectives, rewards, onAccept, onComplete, location, expirySeconds, owner, assignTo, autoAccept);
     }
 
     private static List<Reward> rewards(@Nullable List<RewardDto> list, String id, String section, LoadResult report) {

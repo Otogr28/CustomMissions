@@ -36,7 +36,31 @@ public final class ClientMissions {
     private static volatile MissionSyncS2C snapshot = EMPTY;
     private static boolean openRequested;
 
+    // Pending self-description prompt: held until the player is in-world and free, so it never fights the
+    // loading screen. Opened by pollDescribe() from the client tick.
+    private static volatile boolean describePending;
+    private static volatile String describeText = "";
+    private static volatile boolean describeFirstTime;
+
     private ClientMissions() {}
+
+    // ---- self-description prompt ------------------------------------------------------------------
+
+    /** Queue the self-description screen to open once the client is ready (called from the packet handler). */
+    public static void requestDescribe(String text, boolean firstTime) {
+        describeText = text == null ? "" : text;
+        describeFirstTime = firstTime;
+        describePending = true;
+    }
+
+    /** Open the queued self-description screen when the player is in-world with no other screen open. */
+    public static void pollDescribe(Minecraft mc) {
+        if (!describePending || mc.player == null || mc.level == null || mc.screen != null) {
+            return;
+        }
+        describePending = false;
+        mc.setScreen(new DescribeScreen(describeText, describeFirstTime));
+    }
 
     // ---- HUD tracking ----------------------------------------------------------------------------
 
