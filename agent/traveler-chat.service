@@ -1,0 +1,17 @@
+[Unit]
+Description=CustomMissions — Traveler AI chat brain (Claude Haiku, file-contract sidecar)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Edit SERVER_DIR if the Crafty server UUID changes.
+ExecStart=/opt/custommissions-gen/traveler-chat.sh
+Restart=on-failure
+RestartSec=5
+User=root
+Environment=HOME=/root
+# Optional: an OAuth token instead of an interactive /login lives in /etc/mcserver/claude.env
+
+[Install]
+WantedBy=multi-user.target
